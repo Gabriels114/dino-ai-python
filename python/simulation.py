@@ -69,12 +69,14 @@ class Simulation:
 
     def update(self):
         """Advance the simulation by one frame."""
+        speed = int(self.speed)
+
         # Phase 1: gather inputs for all living dinosaurs
         alive_dinos   = []
         alive_indices = []
         for i, dino in enumerate(self.dinos):
             if dino.alive:
-                dino.prepare_inputs(self._next_obstacle_info(dino), int(self.speed))
+                dino.prepare_inputs(self._next_obstacle_info(dino), speed)
                 alive_dinos.append(dino)
                 alive_indices.append(i)
 
@@ -87,7 +89,7 @@ class Simulation:
 
         # Move enemies and discard those that have scrolled off screen
         for enemy in self.enemies:
-            enemy.update(int(self.speed))
+            enemy.update(speed)
         self.enemies = [e for e in self.enemies if not e.is_offscreen()]
 
         # Spawn a new enemy if enough time has passed
@@ -97,8 +99,19 @@ class Simulation:
             self.last_spawn_time = now
             self.time_to_spawn   = random.uniform(MIN_SPAWN_MS, MAX_SPAWN_MS)
 
-        self._check_collisions()
-        self.ground.update(int(self.speed))
+        # Phase 4: collision detection — reuses alive_dinos, no extra scan needed
+        self.dinos_alive = 0
+        for dino in alive_dinos:
+            for enemy in self.enemies:
+                if dino.alive and dino.is_colliding_with(enemy):
+                    dino.die(self.score)
+            if dino.alive:
+                self.dinos_alive += 1
+
+        if self.dinos_alive == 0:
+            self._next_generation()
+
+        self.ground.update(speed)
         self.speed += 0.001   # gradually increase difficulty
 
     # ── Drawing ────────────────────────────────────────────────────────────────
@@ -131,18 +144,6 @@ class Simulation:
             enemy.toggle_sprite()
 
     # ── Private helpers ────────────────────────────────────────────────────────
-
-    def _check_collisions(self):
-        self.dinos_alive = 0
-        for dino in self.dinos:
-            for enemy in self.enemies:
-                if dino.alive and dino.is_colliding_with(enemy):
-                    dino.die(self.score)
-            if dino.alive:
-                self.dinos_alive += 1
-
-        if self.dinos_alive == 0:
-            self._next_generation()
 
     def _next_generation(self):
         """Apply the genetic algorithm to produce a new population."""

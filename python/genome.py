@@ -58,19 +58,36 @@ class Genome:
         return new_genome
 
     def mutate(self):
-        """Return a mutated copy: replace 1–4 random genes with new ones."""
+        """Return a mutated copy: replace 1–4 random genes and occasionally a bias."""
         mutated = self.copy()
         num_mutations = random.randint(1, 4)
         for _ in range(num_mutations):
             index = random.randint(0, self.length - 1)
             mutated.genes[index] = Gen()
+        # 30% chance to also mutate one bias value
+        if random.random() < 0.3:
+            if random.random() < 0.5:
+                i = random.randint(0, 6)
+                mutated.hidden_layer_bias[i] = random.uniform(-1, 1)
+            else:
+                i = random.randint(0, 1)
+                mutated.output_layer_bias[i] = random.uniform(-1, 1)
         return mutated
 
     def crossover(self, other):
-        """Return a new genome combining genes from self and other."""
+        """Return a new genome combining genes and biases from self and other."""
         child = self.copy()
         num_crossovers = random.randint(1, 4)
         for _ in range(num_crossovers):
             index = random.randint(0, self.length - 1)
             child.genes[index] = other.genes[index]
+        # Cross over each bias independently with 50% probability
+        child.hidden_layer_bias = [
+            other.hidden_layer_bias[i] if random.random() < 0.5 else child.hidden_layer_bias[i]
+            for i in range(len(child.hidden_layer_bias))
+        ]
+        child.output_layer_bias = [
+            other.output_layer_bias[i] if random.random() < 0.5 else child.output_layer_bias[i]
+            for i in range(len(child.output_layer_bias))
+        ]
         return child

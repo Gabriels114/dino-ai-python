@@ -31,6 +31,7 @@ class Dino(GameObject):
         self.brain  = Brain(self.genome)
 
         self.jump_stage = 0.0   # 0 = grounded; 0 < stage ≤ 1 = mid-jump
+        self.crouching  = False
         self.alive      = True
         self.score      = 0
 
@@ -72,8 +73,9 @@ class Dino(GameObject):
 
     def reset(self):
         """Reuse an elite dinosaur in the next generation."""
-        self.alive = True
-        self.score = 0
+        self.alive     = True
+        self.score     = 0
+        self.crouching = False
 
     def toggle_sprite(self):
         """Alternate between walking/crouching animation frames."""
@@ -90,7 +92,7 @@ class Dino(GameObject):
         return self.jump_stage > 0
 
     def is_crouching(self):
-        return self.obj_width == 110   # width changes when crouching
+        return self.crouching
 
     # ------------------------------------------------------------------
     # Internal logic
@@ -149,14 +151,16 @@ class Dino(GameObject):
         self.sprite     = "walking_dino_1"
 
     def _crouch(self):
-        if not self.is_crouching():
+        if not self.crouching:
             self.y_pos      = self.CROUCH_Y
             self.obj_width  = 110
             self.obj_height = 52
+            self.crouching  = True
             self.sprite     = "crouching_dino_1"
 
     def _stop_crouch(self):
         self.y_pos      = self.GROUND_Y
         self.obj_width  = 80
         self.obj_height = 86
+        self.crouching  = False
         self.sprite     = "walking_dino_1"
