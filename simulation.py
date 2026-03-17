@@ -53,6 +53,7 @@ class Simulation:
 
         self.last_gen_avg_score = 0
         self.last_gen_max_score = 0
+        self.all_time_max_score = 0
 
         self.last_spawn_time = pygame.time.get_ticks()
         self.time_to_spawn   = random.uniform(MIN_SPAWN_MS, MAX_SPAWN_MS)
@@ -158,6 +159,8 @@ class Simulation:
 
         self.dinos.sort(key=lambda d: d.score, reverse=True)
         self.last_gen_max_score = self.dinos[0].score
+        if self.last_gen_max_score > self.all_time_max_score:
+            self.all_time_max_score = self.last_gen_max_score
 
         elite_size = int(DINOS_PER_GENERATION * 0.05)   # top 5%
         new_dinos  = []
@@ -277,7 +280,8 @@ class Simulation:
         screen.blit(self.font_large.render(f"Generation: {self.generation}", True, black), (80, 60))
         screen.blit(self.font_large.render(f"Average Score (last gen): {self.last_gen_avg_score}", True, black), (80, 100))
         screen.blit(self.font_large.render(f"Max Score (last gen): {self.last_gen_max_score}", True, black), (80, 140))
-        screen.blit(self.font_large.render(f"Alive: {self.dinos_alive}", True, black), (80, 180))
+        screen.blit(self.font_large.render(f"All-Time Max: {self.all_time_max_score}", True, (180, 0, 0)), (80, 180))
+        screen.blit(self.font_large.render(f"Alive: {self.dinos_alive}", True, black), (80, 220))
 
         # Draw the neural network of the first living dinosaur
         for dino in self.dinos:
