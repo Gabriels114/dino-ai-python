@@ -14,13 +14,18 @@ except ImportError:
 from dino import Dino
 from enemy import Cactus, Bird
 from game_object import Ground
+from genome import Genome
 
 # ── Population settings ────────────────────────────────────────────────────────
 DINOS_PER_GENERATION = 1000
 
-# ── Enemy spawn timing (milliseconds) ─────────────────────────────────────────
-MIN_SPAWN_MS = 500
-MAX_SPAWN_MS = 1500
+SAVE_PATH = "saves/best_genome.json"
+
+# ── Enemy spawn gap (pixels between obstacle right-edge and next spawn) ───────
+# At higher speeds the same pixel gap means less time between obstacles,
+# matching the feel of the original Chrome game.
+MIN_GAP_PIXELS = 300
+MAX_GAP_PIXELS = 800
 
 
 class Simulation:
@@ -46,7 +51,7 @@ class Simulation:
         self.enemies = []
         self.ground  = Ground()
 
-        self.speed        = 15.0
+        self.speed        = 8.0
         self.score        = 0
         self.generation   = 1
         self.dinos_alive  = DINOS_PER_GENERATION
@@ -55,8 +60,11 @@ class Simulation:
         self.last_gen_max_score = 0
         self.all_time_max_score = 0
 
+        # Best genome seen so far (updated every time a new record is set)
+        self.best_genome = self.dinos[0].genome
+
         self.last_spawn_time = pygame.time.get_ticks()
-        self.time_to_spawn   = random.uniform(MIN_SPAWN_MS, MAX_SPAWN_MS)
+        self.time_to_spawn   = self._spawn_gap_ms()
 
         # Upload initial weights to GPU (once per generation)
         self._build_gpu_weights()
@@ -98,7 +106,7 @@ class Simulation:
         if now - self.last_spawn_time > self.time_to_spawn:
             self._spawn_enemy()
             self.last_spawn_time = now
-            self.time_to_spawn   = random.uniform(MIN_SPAWN_MS, MAX_SPAWN_MS)
+            self.time_to_spawn   = self._spawn_gap_ms()
 
         # Phase 4: collision detection — reuses alive_dinos, no extra scan needed
         self.dinos_alive = 0
@@ -149,7 +157,7 @@ class Simulation:
     def _next_generation(self):
         """Apply the genetic algorithm to produce a new population."""
         self.score  = 0
-        self.speed  = 15.0
+        self.speed  = 8.0
         self.generation += 1
         self.enemies.clear()
 
@@ -161,6 +169,7 @@ class Simulation:
         self.last_gen_max_score = self.dinos[0].score
         if self.last_gen_max_score > self.all_time_max_score:
             self.all_time_max_score = self.last_gen_max_score
+            self.best_genome        = self.dinos[0].genome.copy()
 
         elite_size = int(DINOS_PER_GENERATION * 0.05)   # top 5%
         new_dinos  = []
@@ -200,6 +209,14 @@ class Simulation:
 
         self.dinos = new_dinos
         self._build_gpu_weights()   # weights changed — refresh GPU arrays
+
+    def inject_genome(self, genome, score=0):
+        """Replace the first dino's genome with a loaded one and refresh the GPU weights."""
+        self.dinos[0].genome = genome
+        self.dinos[0].init_brain()
+        self.best_genome        = genome.copy()
+        self.all_time_max_score = score
+        self._build_gpu_weights()
 
     def _build_gpu_weights(self):
         """Upload all brain weight matrices to GPU (called once per generation)."""
@@ -266,6 +283,17 @@ class Simulation:
                 result[4] = enemy.obj_height
                 break   # enemies list is ordered left-to-right; first match is closest
         return result
+
+    def _spawn_gap_ms(self):
+        """Convert a random pixel gap to milliseconds at the current speed.
+
+        Using a fixed pixel gap (rather than a fixed time gap) means that
+        at higher speeds obstacles arrive more frequently — matching the
+        original Chrome Dino behaviour.
+        """
+        gap = random.uniform(MIN_GAP_PIXELS, MAX_GAP_PIXELS)
+        frames = gap / max(self.speed, 1)
+        return frames / 60 * 1000
 
     def _spawn_enemy(self):
         if random.random() < 0.5:

@@ -5,6 +5,9 @@ from game_object import GameObject
 from genome import Genome
 from brain import Brain
 
+GRAVITY       = 1.26    # downward acceleration in pixels per frame²
+JUMP_VELOCITY = -20.8   # initial upward velocity on jump (negative = upward)
+
 
 class Dino(GameObject):
     """A dinosaur agent controlled by its neural network (Brain).
@@ -30,7 +33,8 @@ class Dino(GameObject):
         self.genome = Genome()
         self.brain  = Brain(self.genome)
 
-        self.jump_stage = 0.0   # 0 = grounded; 0 < stage ≤ 1 = mid-jump
+        self.jump_stage = 0.0   # 0 = grounded; > 0 = mid-jump
+        self.velocity_y = 0.0   # vertical velocity (positive = downward)
         self.crouching  = False
         self.alive      = True
         self.score      = 0
@@ -73,9 +77,15 @@ class Dino(GameObject):
 
     def reset(self):
         """Reuse an elite dinosaur in the next generation."""
-        self.alive     = True
-        self.score     = 0
-        self.crouching = False
+        self.alive      = True
+        self.score      = 0
+        self.crouching  = False
+        self.jump_stage = 0.0
+        self.velocity_y = 0.0
+        self.y_pos      = self.GROUND_Y
+        self.obj_width  = 80
+        self.obj_height = 86
+        self.sprite     = "walking_dino_1"
 
     def toggle_sprite(self):
         """Alternate between walking/crouching animation frames."""
@@ -110,17 +120,18 @@ class Dino(GameObject):
         self.brain_inputs[3] = (info[3] - 30)   / (146  - 30)     # obstacle width
         self.brain_inputs[4] = (info[4] - 40)   / (96   - 40)     # obstacle height
         self.brain_inputs[5] = (self.y_pos - 278) / (484 - 278)   # dino y position
-        self.brain_inputs[6] = (speed - 15) / (30 - 15)           # game speed
+        self.brain_inputs[6] = (speed - 8) / (30 - 8)             # game speed
 
     def _update_jump(self):
-        """Parabolic jump arc using a parametric equation.
+        """Physics-based jump using constant gravity acceleration.
 
-        y(t) = ground - height * (-4t)(t - 1)   for t in (0, 1]
-        The factor -4t(t-1) is a parabola that peaks at t=0.5.
+        Each frame: velocity increases by GRAVITY (downward), then y_pos
+        is updated by velocity. Landing is detected when y_pos reaches
+        the ground.
         """
-        self.y_pos       = self.GROUND_Y - ((-4 * self.jump_stage * (self.jump_stage - 1)) * 172)
-        self.jump_stage += 0.03
-        if self.jump_stage > 1:
+        self.velocity_y += GRAVITY
+        self.y_pos      += self.velocity_y
+        if self.y_pos >= self.GROUND_Y:
             self._stop_jump()
 
     def _process_brain_output(self):
@@ -143,10 +154,12 @@ class Dino(GameObject):
 
     def _jump(self):
         self.jump_stage = 0.0001
+        self.velocity_y = JUMP_VELOCITY
         self.sprite     = "standing_dino"
 
     def _stop_jump(self):
         self.jump_stage = 0
+        self.velocity_y = 0.0
         self.y_pos      = self.GROUND_Y
         self.sprite     = "walking_dino_1"
 

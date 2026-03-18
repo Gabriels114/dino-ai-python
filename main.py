@@ -12,7 +12,8 @@ import os
 import sys
 import pygame
 
-from simulation import Simulation
+from simulation import Simulation, SAVE_PATH
+from genome import Genome
 
 WINDOW_WIDTH  = 1280
 WINDOW_HEIGHT = 720
@@ -71,6 +72,17 @@ def main():
 
     simulation = Simulation(game_sprites)
 
+    # ── Ask to load saved genome ─────────────────────────────────────
+    if os.path.exists(SAVE_PATH):
+        try:
+            genome, saved_score, saved_gen = Genome.load(SAVE_PATH)
+            answer = input(f"Se encontró un genoma guardado (generación {saved_gen}, puntaje {saved_score}). ¿Cargar? [s/n]: ")
+            if answer.strip().lower() == "s":
+                simulation.inject_genome(genome, saved_score)
+                print("Genoma cargado.")
+        except Exception as e:
+            print(f"No se pudo leer el archivo guardado: {e}")
+
     # Animation clock: incremented every 50 ms to drive sprite flipping
     animation_clock     = 0
     last_animation_tick = pygame.time.get_ticks()
@@ -80,6 +92,14 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
+                answer = input(f"¿Guardar el mejor genoma? (puntaje: {simulation.all_time_max_score}) [s/n]: ")
+                if answer.strip().lower() == "s":
+                    simulation.best_genome.save(
+                        SAVE_PATH,
+                        score=simulation.all_time_max_score,
+                        generation=simulation.generation,
+                    )
+                    print(f"Guardado en {SAVE_PATH}")
                 sys.exit()
 
         # ── Game logic ───────────────────────────────────────────────

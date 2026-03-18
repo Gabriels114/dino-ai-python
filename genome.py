@@ -1,5 +1,7 @@
 import random
 import copy
+import json
+import os
 
 
 class Gen:
@@ -73,6 +75,52 @@ class Genome:
                 i = random.randint(0, 1)
                 mutated.output_layer_bias[i] = random.uniform(-1, 1)
         return mutated
+
+    def save(self, filepath, score=0, generation=0):
+        """Serialize this genome to a JSON file."""
+        data = {
+            "score":              score,
+            "generation":         generation,
+            "hidden_layer_bias":  self.hidden_layer_bias,
+            "output_layer_bias":  self.output_layer_bias,
+            "genes": [
+                {
+                    "source_hidden_layer": g.source_hidden_layer,
+                    "id_source_neuron":    g.id_source_neuron,
+                    "id_target_neuron":    g.id_target_neuron,
+                    "weight":              g.weight,
+                }
+                for g in self.genes
+            ],
+        }
+        os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load(cls, filepath):
+        """Deserialize a genome from a JSON file.
+
+        Returns (genome, score, generation) or raises FileNotFoundError.
+        """
+        with open(filepath) as f:
+            data = json.load(f)
+
+        genome = cls.__new__(cls)
+        genome.length = len(data["genes"])
+        genome.hidden_layer_bias = data["hidden_layer_bias"]
+        genome.output_layer_bias = data["output_layer_bias"]
+
+        genome.genes = []
+        for gd in data["genes"]:
+            g = Gen.__new__(Gen)
+            g.source_hidden_layer = gd["source_hidden_layer"]
+            g.id_source_neuron    = gd["id_source_neuron"]
+            g.id_target_neuron    = gd["id_target_neuron"]
+            g.weight              = gd["weight"]
+            genome.genes.append(g)
+
+        return genome, data.get("score", 0), data.get("generation", 0)
 
     def crossover(self, other):
         """Return a new genome combining genes and biases from self and other."""
